@@ -1,8 +1,8 @@
-  select ie.icustay_id, ce.charttime
+  select ie.stay_id, ce.charttime
     , 1 as RRT
-  from mimiciii.icustays ie
-  inner join mimiciii.chartevents ce
-    on ie.icustay_id = ce.icustay_id
+  from mimiciv_icu.icustays ie
+  inner join mimiciv_icu.chartevents ce
+    on ie.stay_id = ce.stay_id
     --and ce.charttime between ie.intime and ie.intime + interval '1' day
     and itemid in
     (

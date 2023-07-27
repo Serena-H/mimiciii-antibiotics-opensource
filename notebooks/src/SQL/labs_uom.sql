@@ -28,7 +28,7 @@ CASE
         WHEN itemid = 51301 THEN 'WBC'
       ELSE null
     END AS label
-from mimiciii.labevents
+from mimiciv_hosp.labevents
 WHERE itemid in (
       -- comment is: LABEL | CATEGORY | FLUID | NUMBER OF ROWS IN LABEVENTS
       50868, -- ANION GAP | CHEMISTRY | BLOOD | 769895

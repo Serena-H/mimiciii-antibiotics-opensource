@@ -18,7 +18,7 @@
 DROP MATERIALIZED VIEW IF EXISTS ventsettings CASCADE;
 CREATE MATERIALIZED VIEW ventsettings AS
 select
-  icustay_id, charttime
+  stay_id, charttime
   -- case statement determining whether it is an instance of mech vent
   , max(
     case
@@ -103,10 +103,10 @@ select
       )
       as SelfExtubated
       
-from mimiciii.chartevents ce
+from mimiciv_icu.chartevents ce
 where ce.value is not null
 -- exclude rows marked as error
-and ce.error IS DISTINCT FROM 1
+and ce.warning IS DISTINCT FROM 1
 and itemid in
 (
     -- the below are settings used to indicate ventilation
@@ -139,18 +139,18 @@ and itemid in
     -- used in both oxygen + vent calculation
     , 467 -- O2 Delivery Device
 )
-group by icustay_id, charttime
+group by stay_id, charttime
 UNION
 -- add in the extubation flags from procedureevents_mv
 -- note that we only need the start time for the extubation
 -- (extubation is always charted as ending 1 minute after it started)
 select
-  icustay_id, starttime as charttime
+  stay_id, starttime as charttime
   , 0 as MechVent
   , 0 as OxygenTherapy
   , 1 as Extubated
   , case when itemid = 225468 then 1 else 0 end as SelfExtubated
-from mimiciii.procedureevents_mv
+from mimiciv_icu.procedureevents
 where itemid in
 (
   227194 -- "Extubation"
@@ -164,11 +164,11 @@ create MATERIALIZED VIEW ventdurations as
 with vd0 as
 (
   select
-    icustay_id
+    stay_id
     -- this carries over the previous charttime which had a mechanical ventilation event
     , case
         when MechVent=1 then
-          LAG(CHARTTIME, 1) OVER (partition by icustay_id, MechVent order by charttime)
+          LAG(CHARTTIME, 1) OVER (partition by stay_id, MechVent order by charttime)
         else null
       end as charttime_lag
     , charttime
@@ -181,7 +181,7 @@ with vd0 as
 , vd1 as
 (
   select
-      icustay_id
+      stay_id
       , charttime_lag
       , charttime
       , MechVent
@@ -201,7 +201,7 @@ with vd0 as
       , LAG(Extubated,1)
       OVER
       (
-      partition by icustay_id, case when MechVent=1 or Extubated=1 then 1 else 0 end
+      partition by stay_id, case when MechVent=1 or Extubated=1 then 1 else 0 end
       order by charttime
       ) as ExtubatedLag
 
@@ -213,7 +213,7 @@ with vd0 as
             LAG(Extubated,1)
             OVER
             (
-            partition by icustay_id, case when MechVent=1 or Extubated=1 then 1 else 0 end
+            partition by stay_id, case when MechVent=1 or Extubated=1 then 1 else 0 end
             order by charttime
             )
             = 1 then 1
@@ -234,25 +234,25 @@ with vd0 as
   -- this results in a monotonic integer assigned to each instance of ventilation
   , case when MechVent=1 or Extubated = 1 then
       SUM( newvent )
-      OVER ( partition by icustay_id order by charttime )
+      OVER ( partition by stay_id order by charttime )
     else null end
     as ventnum
   --- now we convert CHARTTIME of ventilator settings into durations
   from vd1
 )
 -- create the durations for each mechanical ventilation instance
-select icustay_id
+select stay_id
   -- regenerate ventnum so it's sequential
-  , ROW_NUMBER() over (partition by icustay_id order by ventnum) as ventnum
+  , ROW_NUMBER() over (partition by stay_id order by ventnum) as ventnum
   , min(charttime) as starttime
   , max(charttime) as endtime
   , extract(epoch from max(charttime)-min(charttime))/60/60 AS duration_hours
 from vd2
-group by icustay_id, ventnum
+group by stay_id, ventnum
 having min(charttime) != max(charttime)
 -- patient had to be mechanically ventilated at least once
 -- i.e. max(mechvent) should be 1
 -- this excludes a frequent situation of NIV/oxygen before intub
 -- in these cases, ventnum=0 and max(mechvent)=0, so they are ignored
 and max(mechvent) = 1
-order by icustay_id, ventnum;
+order by stay_id, ventnum;

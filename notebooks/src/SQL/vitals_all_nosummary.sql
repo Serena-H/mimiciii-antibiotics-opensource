@@ -2,7 +2,7 @@ DROP MATERIALIZED VIEW IF EXISTS vitals_all_nosummary CASCADE;
 create materialized view vitals_all_nosummary as SELECT *
 
 FROM  (
-  select ie.subject_id, ie.hadm_id, ie.icustay_id, ce.charttime, ce.valueuom --added ce.charttime  10/12/18 added ce.valueuom
+  select ie.subject_id, ie.hadm_id, ie.stay_id, ce.charttime, ce.valueuom --added ce.charttime  10/12/18 added ce.valueuom
   , case
     when itemid in (211,220045) and valuenum > 0 and valuenum < 300 then 'HeartRate' -- HeartRate
     when itemid in (51,442,455,6701,220179,220050) and valuenum > 0 and valuenum < 400 then 'SysBP' -- SysBP
@@ -18,10 +18,11 @@ FROM  (
       -- convert F to C
   , case when itemid in (223761,678) then (valuenum-32)/1.8 else valuenum end as valuenum
 
-  from mimiciii.icustays ie
-  left join mimiciii.chartevents ce
-  on ie.subject_id = ce.subject_id and ie.hadm_id = ce.hadm_id and ie.icustay_id = ce.icustay_id
-  and ce.error IS DISTINCT FROM 1
+  from mimiciv_icu.icustays ie
+  left join mimiciv_icu.chartevents ce
+  on ie.subject_id = ce.subject_id and ie.hadm_id = ce.hadm_id and ie.stay_id = ce.stay_id
+  --mimiciv does not have error, we changed it to warning
+  and ce.warning IS DISTINCT FROM 1
   where ce.itemid in
   (
   -- HEART RATE

@@ -1,4 +1,4 @@
- select ie.icustay_id, ce.charttime
+ select ie.stay_id, ce.charttime
     , (
         case
           when ce.itemid in (152,148,149,146,147,151,150) and value is not null then 1
@@ -6,9 +6,9 @@
           when ce.itemid = 582 and value in ('CAVH Start','CAVH D/C','CVVHD Start','CVVHD D/C','Hemodialysis st','Hemodialysis end') then 1
         else 0 end
         ) as RRT
-  from mimiciii.icustays ie
-  inner join mimiciii.chartevents ce
-    on ie.icustay_id = ce.icustay_id
+  from mimiciv_icu.icustays ie
+  inner join mimiciv_icu.chartevents ce
+    on ie.stay_id = ce.stay_id
     and ce.itemid in
     (
        152 -- "Dialysis Type";61449
@@ -30,4 +30,4 @@
     )
     and ce.value is not null
     --and ce.charttime between ie.intime and ie.intime + interval '1' day
-  where ie.dbsource = 'carevue'
+  --where ie.dbsource = 'carevue'

@@ -1,7 +1,7 @@
 DROP MATERIALIZED VIEW IF EXISTS fio2_chartevents CASCADE;
 create materialized view fio2_chartevents as
 
-  select SUBJECT_ID, HADM_ID, ICUSTAY_ID, CHARTTIME
+  select SUBJECT_ID, HADM_ID, STAY_ID, CHARTTIME
     -- pre-process the FiO2s to ensure they are between 21-100%
     , max(
         case
@@ -23,7 +23,7 @@ create materialized view fio2_chartevents as
             then valuenum * 100
       else null end
     ) as valuenum
-  from mimiciii.CHARTEVENTS
+  from mimiciv_icu.CHARTEVENTS
   where ITEMID in
   (
     3420 -- FiO2
@@ -32,6 +32,6 @@ create materialized view fio2_chartevents as
   , 3422 -- FiO2 [measured]
   )
   -- exclude rows marked as error
-  and error IS DISTINCT FROM 1
-  group by SUBJECT_ID, HADM_ID, ICUSTAY_ID, CHARTTIME 
+  and warning IS DISTINCT FROM 1
+  group by SUBJECT_ID, HADM_ID, STAY_ID, CHARTTIME 
   

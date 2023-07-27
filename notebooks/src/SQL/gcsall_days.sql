@@ -28,7 +28,7 @@ DROP MATERIALIZED VIEW IF EXISTS gcsall_days CASCADE;
 create materialized view gcsall_days as
 with base as
 (
-  SELECT pvt.ICUSTAY_ID
+  SELECT pvt.STAY_ID
   , pvt.charttime, pvt.day
 
   -- Easier names - note we coalesced Metavision and CareVue IDs below
@@ -44,10 +44,10 @@ with base as
     end as EndoTrachFlag
 
   , ROW_NUMBER ()
-          OVER (PARTITION BY pvt.ICUSTAY_ID ORDER BY pvt.charttime ASC) as rn
+          OVER (PARTITION BY pvt.STAY_ID ORDER BY pvt.charttime ASC) as rn
 
   FROM  (
-  select l.ICUSTAY_ID, ceiling((extract( epoch from l.charttime - b.intime))/60/60/24) as day
+  select l.STAY_ID, ceiling((extract( epoch from l.charttime - b.intime))/60/60/24) as day
   -- merge the ITEMIDs so that the pivot applies to both metavision/carevue data
   , case
       when l.ITEMID in (723,223900) then 723
@@ -66,11 +66,11 @@ with base as
       end
     as VALUENUM
   , l.CHARTTIME
-  from mimiciii.CHARTEVENTS l
+  from mimiciv_icu.CHARTEVENTS l
 
   -- get intime for charttime subselection
-  inner join mimiciii.icustays b
-    on l.icustay_id = b.icustay_id
+  inner join mimiciv_icu.icustays b
+    on l.stay_id = b.stay_id
 
   -- Isolate the desired GCS variables
   where l.ITEMID in
@@ -84,9 +84,9 @@ with base as
   -- Only get data for the first 24 hours
   --and l.charttime between b.intime and b.intime + interval '1' day
   -- exclude rows marked as error
-  and l.error IS DISTINCT FROM 1 and l.charttime >= b.intime
+  and l.warning IS DISTINCT FROM 1 and l.charttime >= b.intime
   ) pvt
-  group by pvt.ICUSTAY_ID, pvt.charttime, day
+  group by pvt.STAY_ID, pvt.charttime, day
 )
 , gcs as (
   select b.*
@@ -120,18 +120,18 @@ with base as
   from base b
   -- join to itself within 6 hours to get previous value
   left join base b2
-    on b.ICUSTAY_ID = b2.ICUSTAY_ID and b.rn = b2.rn+1 and b2.charttime > b.charttime - interval '6' hour
+    on b.STAY_ID = b2.STAY_ID and b.rn = b2.rn+1 and b2.charttime > b.charttime - interval '6' hour
 )
 , gcs_final as (
   select gcs.*
   -- This sorts the data by GCS, so rn=1 is the the lowest GCS values to keep
   , ROW_NUMBER ()
-          OVER (PARTITION BY gcs.ICUSTAY_ID
+          OVER (PARTITION BY gcs.STAY_ID
                 ORDER BY gcs.GCS
                ) as IsMinGCS
   from gcs
 )
-select ie.SUBJECT_ID, ie.HADM_ID, ie.ICUSTAY_ID, gs.day
+select ie.SUBJECT_ID, ie.HADM_ID, ie.STAY_ID, gs.day
 -- The minimum GCS is determined by the above row partition, we only join if IsMinGCS=1
 , GCS as MinGCS
 , coalesce(GCSMotor,GCSMotorPrev) as GCSMotor
@@ -140,7 +140,7 @@ select ie.SUBJECT_ID, ie.HADM_ID, ie.ICUSTAY_ID, gs.day
 , EndoTrachFlag as EndoTrachFlag
 
 -- subselect down to the cohort of eligible patients
-from mimiciii.icustays ie
+from mimiciv_icu.icustays ie
 left join gcs_final gs
-  on ie.ICUSTAY_ID = gs.ICUSTAY_ID and gs.IsMinGCS = 1
-ORDER BY ie.ICUSTAY_ID;
+  on ie.STAY_ID = gs.STAY_ID and gs.IsMinGCS = 1
+ORDER BY ie.STAY_ID;

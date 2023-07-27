@@ -2,11 +2,11 @@
 --added value to the select statement and groupby/orderby.
 DROP MATERIALIZED VIEW IF EXISTS bg_all_nosummary CASCADE;
 create materialized view bg_all_nosummary as
-select pvt.SUBJECT_ID, pvt.HADM_ID, pvt.ICUSTAY_ID, pvt.CHARTTIME, label, valuenum,  value, valueuom--, PaO2_flag   added uom 12/18/18
+select pvt.SUBJECT_ID, pvt.HADM_ID, pvt.STAY_ID, pvt.CHARTTIME, label, valuenum,  value, valueuom--, PaO2_flag   added uom 12/18/18
 
 from
 ( -- begin query that extracts the data
-  select ie.subject_id, ie.hadm_id, ie.icustay_id, valueuom -- added valueuom 12/18/18
+  select ie.subject_id, ie.hadm_id, ie.stay_id, valueuom -- added valueuom 12/18/18
   -- here we assign labels to ITEMIDs
   -- this also fuses together multiple ITEMIDs containing the same data
       , case
@@ -53,8 +53,8 @@ from
         else valuenum
         end as valuenum
 
-    from mimiciii.icustays ie
-    left join mimiciii.labevents le
+    from mimiciv_icu.icustays ie
+    left join mimiciv_hosp.labevents le
       on le.subject_id = ie.subject_id and le.hadm_id = ie.hadm_id
       --and le.charttime between (ie.intime - interval '6' hour) and (ie.intime + interval '1' day)
       and le.ITEMID in
@@ -66,8 +66,8 @@ from
         , 51545
       )
 ) pvt
-group by pvt.subject_id, pvt.hadm_id, pvt.icustay_id, pvt.CHARTTIME, label, valuenum, value, valueuom --, PaO2_flag
-order by pvt.subject_id, pvt.hadm_id, pvt.icustay_id, pvt.CHARTTIME, label, valuenum, value, valueuom --, PaO2_flag
+group by pvt.subject_id, pvt.hadm_id, pvt.stay_id, pvt.CHARTTIME, label, valuenum, value, valueuom --, PaO2_flag
+order by pvt.subject_id, pvt.hadm_id, pvt.stay_id, pvt.CHARTTIME, label, valuenum, value, valueuom --, PaO2_flag
 ; 
 
 --my annotation:

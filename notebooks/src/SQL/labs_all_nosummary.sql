@@ -1,11 +1,11 @@
 -- modified vital_all48 by removing the between intime and intime + 2days note and the ie.subject_id in {}.
 DROP MATERIALIZED VIEW IF EXISTS labs_all_nosummary CASCADE;
 create materialized view labs_all_nosummary as
-select pvt.SUBJECT_ID, pvt.HADM_ID, pvt.ICUSTAY_ID, pvt.CHARTTIME, label, valuenum
+select pvt.SUBJECT_ID, pvt.HADM_ID, pvt.STAY_ID, pvt.CHARTTIME, label, valuenum
 
 FROM
 ( -- begin query that extracts the data
-  SELECT ie.subject_id, ie.hadm_id, ie.icustay_id, le.charttime
+  SELECT ie.subject_id, ie.hadm_id, ie.stay_id, le.charttime
   -- here we assign labels to ITEMIDs
   -- this also fuses together multiple ITEMIDs containing the same data
   , CASE
@@ -86,9 +86,9 @@ FROM
     ELSE le.valuenum
     END AS valuenum
 
-  FROM mimiciii.icustays ie
+  FROM mimiciv_icu.icustays ie
 	--where ie.subject_id in (24915,24942,24968,24776,24714,24824)
-  LEFT JOIN mimiciii.labevents le
+  LEFT JOIN mimiciv_hosp.labevents le
     ON le.subject_id = ie.subject_id AND le.hadm_id = ie.hadm_id
     --AND le.charttime BETWEEN (ie.intime - interval '6' hour) AND (ie.intime + interval '2' day)
 	--AND le.subject_id in  {}--!!THIS IS THE code to get for only specific pt. 
